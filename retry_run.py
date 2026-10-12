@@ -100,7 +100,7 @@ def main():
 
     log("Добор закончен.")
     if final and report:
-        notify.send_admin("🌒 Вечерний добор\n\n" + "\n".join(report))
+        notify.send_owner("🌒 Вечерний добор\n\n" + "\n".join(report))
 
 
 def build_warning(still, err):

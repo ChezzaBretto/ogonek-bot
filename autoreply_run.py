@@ -18,7 +18,7 @@ import notify
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 USERS = os.path.join(HERE, "users")
-PY = sys.executable  # тот же интерпретатор, что запустил процесс (venv-friendly)
+PY = sys.executable  # тот же интерпретатор, что запустил процесс (работает и из venv)
 TIMEOUT = 20 * 60
 
 log = core.make_logger(os.path.join(HERE, "autoreply.log"))

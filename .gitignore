@@ -1,5 +1,5 @@
 # --- СЕКРЕТЫ И ЛИЧНЫЕ ДАННЫЕ: не коммитить никогда ---
-config.json          # реальный токен бота, admin_id, инвайт-код
+config.json          # реальный токен бота и owner_id
 users/               # сессии TikTok (cookies.json), списки чатов, профили
 *.pickle             # состояние диалогов python-telegram-bot
 

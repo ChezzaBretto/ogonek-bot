@@ -15,7 +15,7 @@ import notify
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 USERS = os.path.join(HERE, "users")
-PY = sys.executable  # тот же интерпретатор, что запустил процесс (venv-friendly)
+PY = sys.executable  # тот же интерпретатор, что запустил процесс (работает и из venv)
 TIMEOUT = 25 * 60  # на одного пользователя
 
 log = core.make_logger(os.path.join(HERE, "daily.log"))
@@ -96,7 +96,7 @@ def main():
 
     log("Готово.")
     if report:
-        notify.send_admin("🌙 Ночной прогон\n\n" + "\n".join(report))
+        notify.send_owner("🌙 Ночной прогон\n\n" + "\n".join(report))
 
 
 if __name__ == "__main__":

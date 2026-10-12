@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-Telegram-бот продления огоньков TikTok для нескольких человек.
+Личный Telegram-бот продления огоньков TikTok.
 
-Друг заходит в бота → вводит инвайт-код → сканирует QR из TikTok-приложения →
-присылает список ников → каждую ночь в 00:00 МСК бот шлёт им ❤️.
+Бот работает только для своего владельца: владелец подключает свой TikTok
+(QR или файл сессии) → присылает список чатов → каждую ночь бот сам шлёт в них
+❤️. Чужие пользователи боту недоступны.
 
-Запуск: python bot.py   (под systemd-юнитом tiktok-tgbot)
+Запуск: python bot.py
 """
-import sys, os, json, html, asyncio, secrets, shutil, datetime
+import sys, os, json, html, asyncio, shutil, datetime
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -23,7 +24,7 @@ from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler,
 HERE = os.path.dirname(os.path.abspath(__file__))
 USERS = os.path.join(HERE, "users")
 CONFIG = os.path.join(HERE, "config.json")
-PY = sys.executable  # тот же интерпретатор, что запустил процесс (venv-friendly)
+PY = sys.executable  # тот же интерпретатор, что запустил процесс (работает и из venv)
 
 log = core.make_logger(os.path.join(HERE, "tgbot.log"))
 
@@ -83,8 +84,8 @@ def is_registered(uid):
     return os.path.exists(os.path.join(user_dir(uid), "profile.json"))
 
 
-def is_admin(uid):
-    return str(uid) == str(cfg().get("admin_id"))
+def is_owner(uid):
+    return str(uid) == str(cfg().get("owner_id"))
 
 
 def targets_of(uid):
@@ -193,30 +194,32 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = u.id
     c = cfg()
 
-    # первый, кто написал боту, становится админом
-    if not c.get("admin_id"):
-        c["admin_id"] = str(uid)
+    # Личный бот: владелец — тот, чей id в owner_id. Если он не задан,
+    # владельцем становится первый, кто написал боту, и его id сохраняется.
+    if not c.get("owner_id"):
+        c["owner_id"] = str(uid)
         save_cfg(c)
-        save_profile(uid, {"name": u.full_name, "username": u.username or "",
-                           "joined": datetime.date.today().isoformat(), "admin": True})
+
+    if not is_owner(uid):
         await update.message.reply_text(
-            "Ты админ этого бота.\n\nИнвайт-код для друзей: <code>{}</code>\n"
-            "Меняется командой /code, список подключённых — /users.".format(esc(c.get("invite_code", ""))),
-            parse_mode=ParseMode.HTML, reply_markup=KEYBOARD)
+            "Это личный бот — он работает только для своего владельца.")
         return
 
-    if is_registered(uid):
-        await update.message.reply_text("С возвращением. Что делаем?", reply_markup=KEYBOARD)
-        return
+    if not is_registered(uid):
+        save_profile(uid, {"name": u.full_name, "username": u.username or "",
+                           "joined": datetime.date.today().isoformat()})
 
-    ctx.user_data["awaiting"] = "code"
     await update.message.reply_text(
-        "Привет. Этот бот держит огоньки 🔥 в TikTok — каждую ночь сам шлёт ❤️ в чаты, "
-        "которые ты выберешь.\n\nПришли инвайт-код, чтобы начать.")
+        "Привет. Этот бот держит огоньки 🔥 в TikTok — каждую ночь сам шлёт ❤️ "
+        "в выбранные чаты.\n\nДва шага для старта:\n"
+        "1. «🔗 Подключить TikTok»\n2. «✏️ Задать список»",
+        reply_markup=KEYBOARD)
 
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
+    if not is_owner(uid):
+        return
     text = (update.message.text or "").strip()
     awaiting = ctx.user_data.get("awaiting")
     log("MSG {} awaiting={}: {}".format(uid, awaiting or "-", text.replace("\n", " ⏎ ")[:100]))
@@ -230,25 +233,8 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if text != BTN_CHATS:
             ctx.user_data.pop("awaiting", None)
 
-    if awaiting == "code":
-        if text == cfg().get("invite_code"):
-            u = update.effective_user
-            save_profile(uid, {"name": u.full_name, "username": u.username or "",
-                               "joined": datetime.date.today().isoformat()})
-            ctx.user_data.pop("awaiting", None)
-            log("Новый пользователь: {} ({})".format(u.full_name, uid))
-            await notify_admin(ctx, "➕ Подключился: {} (@{})".format(u.full_name, u.username or "—"))
-            await update.message.reply_text(
-                "Код принят.\n\nДальше два шага:\n"
-                "1. «🔗 Подключить TikTok» — пришлю QR, отсканируешь его камерой в приложении TikTok\n"
-                "2. «✏️ Задать список» — скажешь, в какие чаты слать ❤️",
-                reply_markup=KEYBOARD)
-        else:
-            await update.message.reply_text("Код не подошёл. Попроси актуальный у того, кто дал бота.")
-        return
-
     if not is_registered(uid):
-        await update.message.reply_text("Сначала /start и инвайт-код.")
+        await update.message.reply_text("Напиши /start, чтобы начать.")
         return
 
     if awaiting == "targets":
@@ -595,9 +581,11 @@ async def cmd_cookies(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def on_document(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Импорт сессии TikTok файлом — обход QR-входа."""
     uid = update.effective_user.id
+    if not is_owner(uid):
+        return
     chat_id = update.effective_chat.id
     if not is_registered(uid):
-        await update.message.reply_text("Сначала /start и инвайт-код.")
+        await update.message.reply_text("Напиши /start, чтобы начать.")
         return
 
     doc = update.message.document
@@ -653,14 +641,14 @@ async def on_document(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "✅ TikTok подключён, вижу {} чат(ов).\n\nДальше «📋 Показать мои чаты», "
         "потом «✏️ Задать список».".format(len(chats)))
     await ctx.bot.send_message(chat_id, "Что делаем?", reply_markup=KEYBOARD)
-    await notify_admin(ctx, "🔑 {} подключил TikTok файлом сессии".format(
-        esc(profile(uid).get("name", uid))))
 
 
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
     await q.answer()
     uid = q.from_user.id
+    if not is_owner(uid):
+        return
     if q.data == "wipe":
         shutil.rmtree(user_dir(uid), ignore_errors=True)
         log("Отключился: {}".format(uid))
@@ -709,53 +697,11 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text("Отменил, всё на месте.")
 
 
-# ---------- админские команды ----------
-
-async def notify_admin(ctx, text):
-    admin = cfg().get("admin_id")
-    if admin:
-        try:
-            await ctx.bot.send_message(admin, text)
-        except Exception:
-            pass
-
-
-async def cmd_code(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.effective_user.id):
-        return
-    c = cfg()
-    arg = " ".join(ctx.args).strip()
-    if arg:
-        c["invite_code"] = arg
-        save_cfg(c)
-        await update.message.reply_text("Новый инвайт-код: <code>{}</code>".format(esc(arg)),
-                                        parse_mode=ParseMode.HTML)
-    else:
-        await update.message.reply_text("Инвайт-код: <code>{}</code>\nСменить: /code новыйкод".format(
-            esc(c.get("invite_code", ""))), parse_mode=ParseMode.HTML)
-
-
-async def cmd_users(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    if not is_admin(update.effective_user.id):
-        return
-    rows = []
-    for d in sorted(os.listdir(USERS)) if os.path.isdir(USERS) else []:
-        prof = profile(d)
-        has_tt = os.path.exists(os.path.join(user_dir(d), "cookies.json"))
-        rows.append("• {} — {} чат(ов), TikTok {}".format(
-            esc(prof.get("name", d)), len(targets_of(d)), "✅" if has_tt else "—"))
-    await update.message.reply_text("Подключены:\n" + ("\n".join(rows) if rows else "никого"),
-                                    parse_mode=ParseMode.HTML)
-
-
 def main():
     c = cfg()
     if not c.get("token"):
         print("Нет токена в config.json")
         return
-    if not c.get("invite_code"):
-        c["invite_code"] = secrets.token_hex(3).upper()
-        save_cfg(c)
     os.makedirs(USERS, exist_ok=True)
 
     # Сервер в РФ, Bot API режется DPI — ходим к Telegram через локальный
@@ -771,8 +717,6 @@ def main():
         builder = builder.proxy(proxy).get_updates_proxy(proxy)
     app = builder.build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("code", cmd_code))
-    app.add_handler(CommandHandler("users", cmd_users))
     app.add_handler(CommandHandler("cookies", cmd_cookies))
     app.add_handler(CallbackQueryHandler(on_button))
     app.add_handler(MessageHandler(filters.Document.ALL, on_document))

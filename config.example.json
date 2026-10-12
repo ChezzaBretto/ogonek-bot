@@ -1,7 +1,6 @@
 {
   "token": "ВСТАВЬ_СЮДА_ТОКЕН_ОТ_@BotFather",
-  "admin_id": "",
-  "invite_code": "CHANGE_ME",
+  "owner_id": "",
   "proxy": "",
   "autoreply_every": 10,
   "autoreply_limit": 0

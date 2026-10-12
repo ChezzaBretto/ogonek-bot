@@ -33,5 +33,7 @@ def send(chat_id, text):
         return False
 
 
-def send_admin(text):
-    return send(_cfg().get("admin_id"), text)
+def send_owner(text):
+    """Служебное сообщение владельцу бота (отчёт о ночном прогоне и т.п.)."""
+    c = _cfg()
+    return send(c.get("owner_id") or c.get("admin_id"), text)
