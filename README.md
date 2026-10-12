@@ -1,87 +1,87 @@
 # TikTok Ogonyok Bot
 
-Телеграм-бот, который сам держит «огоньки» (streak) в TikTok. Каждую ночь он
-заходит в веб-версию TikTok и рассылает ❤️ в выбранные чаты, чтобы серия не
-обнулялась. Дополнительно умеет автоматически отвечать случайной фразой на
-присланные тебе видео.
+A Telegram bot that keeps your TikTok streaks ("ogonyok") alive. Every night it
+opens the TikTok web app and sends ❤️ to the chats you picked, so the streak
+never resets. It can also auto-reply with a random phrase to videos people send
+you.
 
-Бот личный: работает только для своего владельца. Чужие люди подключить к нему
-свой TikTok не могут.
+The bot is personal: it works only for its owner. Other people can't connect
+their own TikTok to it.
 
-## Как это работает
+## How it works
 
-1. Ты пишешь боту в Telegram и подключаешь свой аккаунт TikTok — либо
-   сканируешь QR-код из приложения, либо присылаешь файл сессии (cookies).
-2. Говоришь боту, в какие чаты слать ❤️ (список ников).
-3. Дальше бот работает сам:
-   - в полночь проходит по списку и отправляет ❤️ в каждый чат;
-   - несколько раз в день добирает тех, кому не отправилось с первого раза;
-   - если включён автоответ — раз в несколько минут смотрит выбранные чаты и
-     отвечает на новые видео фразой из твоего набора.
+1. You message the bot in Telegram and connect your TikTok account — either by
+   scanning a QR code from the app, or by sending a session file (cookies).
+2. You tell the bot which chats to send ❤️ to (a list of usernames).
+3. From then on the bot runs on its own:
+   - at midnight it goes through the list and sends ❤️ to each chat;
+   - a few times a day it retries the chats that didn't go through;
+   - if auto-reply is on, every few minutes it checks the selected chats and
+     replies to new videos with a phrase from your set.
 
-Отправка идёт через настоящий браузер (Chromium под управлением Playwright) —
-бот заходит на tiktok.com с твоей сессией и кликает как живой пользователь.
-Между сообщениями держатся случайные паузы 6–25 секунд.
+Sending goes through a real browser (Chromium driven by Playwright) — the bot
+opens tiktok.com with your session and clicks like a live user. There are random
+6–25 second pauses between messages.
 
-Управление — кнопками прямо в чате с ботом: подключить TikTok, показать список
-своих чатов, задать список для рассылки, проверить без отправки, отправить
-сейчас, настроить автоответ, отключиться.
+You control everything with buttons right in the chat: connect TikTok, show your
+chats, set the list, check without sending, send now, configure auto-reply,
+disconnect.
 
-## Что нужно из железа
+## What hardware you need
 
-**Хватает одного сервера.** Подойдёт самый дешёвый Linux-VPS: 1 ядро и 1–2 ГБ
-памяти. На нём крутится всё сразу — и сам бот, и браузер, и расписание (cron).
-Chromium запускается строго по одному за раз, поэтому даже 1 ГБ хватает.
+**One server is enough.** The cheapest Linux VPS will do: 1 core and 1–2 GB of
+RAM. It runs everything at once — the bot, the browser, and the schedule (cron).
+Chromium is launched strictly one at a time, so even 1 GB is fine.
 
-Можно и на домашнем компьютере/мини-ПК, который не выключается на ночь, —
-принципиальной разницы нет, нужен просто Linux и постоянный доступ в интернет.
+A home machine or mini-PC that stays on overnight works too — there's no real
+difference, you just need Linux and a permanent internet connection.
 
-Отдельно про страну: **если арендовать сервер в своей стране — больше ничего не
-нужно, одного сервера достаточно.** Второй сервер (прокси) понадобится только в
-одном случае: TikTok привязывает сессию к стране, где ты в неё вошёл, и если
-сервер окажется в другой стране — TikTok выкинет сессию. Тогда трафик браузера
-пускают через SOCKS5-туннель в нужной стране (см. ниже). Telegram при этом ходит
-напрямую.
+A note on country: **if you rent the server in your own country, you don't need
+anything else — one server is enough.** A second server (a proxy) is only needed
+in one case: TikTok ties the session to the country where you logged in, so if
+the server is in a different country, TikTok will drop the session. In that case
+you route the browser traffic through a SOCKS5 tunnel in the right country (see
+below). Telegram still connects directly.
 
-## Установка
+## Install
 
 ```bash
 git clone https://github.com/ppetrukovich-gif/ogonek-bot.git
 cd ogonek-bot
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-playwright install chromium          # при необходимости ещё: playwright install-deps
+playwright install chromium          # if needed, also: playwright install-deps
 
 cp config.example.json config.json
 ```
 
-В `config.json` впиши токен бота от [@BotFather](https://t.me/BotFather).
-Поле `owner_id` можно оставить пустым — владельцем станет тот, кто первым
-напишет боту `/start`, и его id запомнится автоматически.
+Put your bot token from [@BotFather](https://t.me/BotFather) into `config.json`.
+You can leave `owner_id` empty — the first person to send `/start` becomes the
+owner, and their id is remembered automatically.
 
-Запуск:
+Run it:
 
 ```bash
 python bot.py
 ```
 
-Напиши боту `/start` и дальше действуй по кнопкам: сначала «Подключить TikTok»,
-потом «Задать список».
+Send `/start` to the bot and follow the buttons: first "Connect TikTok", then
+"Set the list".
 
-## Автозапуск и расписание
+## Autostart and schedule
 
-Чтобы бот жил постоянно, оформи его сервисом (пример — в
+To keep the bot running permanently, set it up as a service (see
 `tiktok-ogonek.service.example`):
 
 ```bash
 sudo cp tiktok-ogonek.service.example /etc/systemd/system/tiktok-ogonek.service
-# поправь в файле User и пути, затем:
+# edit User and the paths in the file, then:
 sudo systemctl daemon-reload
 sudo systemctl enable --now tiktok-ogonek
 ```
 
-Ночная рассылка, доборы и автоответ запускаются по расписанию через cron
-(подставь свои пути):
+The nightly send, the retries and the auto-reply run on a schedule via cron
+(adjust the paths):
 
 ```cron
 0  0       * * *  /opt/ogonek-bot/.venv/bin/python /opt/ogonek-bot/daily_run.py
@@ -89,54 +89,59 @@ sudo systemctl enable --now tiktok-ogonek
 */10 * * * *      /opt/ogonek-bot/.venv/bin/python /opt/ogonek-bot/autoreply_run.py
 ```
 
-Время считается по таймзоне сервера — выставь нужную командой
-`timedatectl set-timezone Europe/Moscow` (или свою). Переменная `CRON_TZ` в cron
-на Ubuntu не действует, именно таймзону системы и надо менять.
+Times follow the server's timezone — set it with
+`timedatectl set-timezone Europe/Moscow` (or your own). The `CRON_TZ` variable
+has no effect in cron on Ubuntu, so you have to change the system timezone
+itself.
 
-## Сессия привязана к другой стране
+## Session tied to another country
 
-Если сервер в одной стране, а сессия TikTok заведена в другой, направь трафик
-браузера через SOCKS5-туннель в нужной стране. Задаётся переменной окружения:
+If the server is in one country and your TikTok session was created in another,
+route the browser traffic through a SOCKS5 tunnel in the right country. It's set
+via an environment variable:
 
 ```bash
 export TT_PROXY=socks5://127.0.0.1:41080
 ```
 
-Поднять такой туннель проще всего по SSH на любую машину в нужной стране:
+The easiest way to get such a tunnel is over SSH to any machine in the right
+country:
 
 ```bash
-ssh -N -D 127.0.0.1:41080 user@host-в-нужной-стране
+ssh -N -D 127.0.0.1:41080 user@host-in-the-right-country
 ```
 
-Логин/пароль в прокси Chromium не поддерживает — туннель должен быть без
-авторизации, как в примере выше. Для cron переменную `TT_PROXY` надо прописать
-первой строкой crontab, а для сервиса — в юните (`Environment=TT_PROXY=...`).
+Chromium doesn't support a username/password proxy, so the tunnel must have no
+authentication, as in the example above. For cron, put `TT_PROXY` on the first
+line of the crontab; for the service, put it in the unit
+(`Environment=TT_PROXY=...`).
 
-## Файлы проекта
+## Project files
 
-| Файл | Назначение |
-|------|------------|
-| `bot.py` | сам телеграм-бот: кнопки, команды, диалоги |
-| `tt_core.py` | работа с TikTok-вебом: сессия, браузер, чаты, отправка |
-| `runner.py` | разовый прогон рассылки или проверки |
-| `daily_run.py` | ночная рассылка (cron) |
-| `retry_run.py` | дневные доборы (cron) |
-| `autoreply.py`, `autoreply_run.py` | автоответ на видео (cron) |
-| `qr_login.py`, `qr_session.sh` | вход в TikTok по QR-коду |
-| `notify.py` | служебные сообщения владельцу из cron-скриптов |
+| File | Purpose |
+|------|---------|
+| `bot.py` | the Telegram bot itself: buttons, commands, dialogs |
+| `tt_core.py` | TikTok web handling: session, browser, chats, sending |
+| `runner.py` | a single send or check run |
+| `daily_run.py` | the nightly send (cron) |
+| `retry_run.py` | daytime retries (cron) |
+| `autoreply.py`, `autoreply_run.py` | auto-reply to videos (cron) |
+| `qr_login.py`, `qr_session.sh` | TikTok login via QR code |
+| `notify.py` | service messages to the owner from the cron scripts |
 
-Твои данные (сессия, списки чатов, настройки) хранятся в `users/<telegram_id>/`.
-Эта папка и `config.json` в репозиторий не попадают.
+Your data (session, chat lists, settings) is stored in `users/<telegram_id>/`.
+That folder and `config.json` are kept out of the repository.
 
-## Безопасность
+## Security
 
-- `config.json` (токен бота) и папку `users/` (сессия TikTok) нельзя выкладывать
-  в открытый доступ — они уже в `.gitignore`.
-- Файл сессии TikTok = полный доступ к аккаунту. Бот хранит его с правами `600`
-  и удаляет присланное сообщение с файлом сразу после импорта.
-- Если токен бота всё-таки куда-то попал — отзови его у @BotFather и возьми
-  новый.
+- `config.json` (the bot token) and the `users/` folder (the TikTok session)
+  must never be made public — they're already in `.gitignore`.
+- A TikTok session file equals full access to the account. The bot stores it
+  with `600` permissions and deletes the message with the file right after
+  importing it.
+- If the bot token ends up somewhere it shouldn't, revoke it in @BotFather and
+  get a new one.
 
-## Лицензия
+## License
 
 MIT
