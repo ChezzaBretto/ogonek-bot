@@ -46,7 +46,7 @@ below). Telegram still connects directly.
 ## Install
 
 ```bash
-git clone https://github.com/ppetrukovich-gif/ogonek-bot.git
+git clone https://github.com/ChezzaBretto/ogonek-bot.git
 cd ogonek-bot
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
