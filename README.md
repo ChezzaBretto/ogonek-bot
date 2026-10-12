@@ -28,6 +28,24 @@ You control everything with buttons right in the chat: connect TikTok, show your
 chats, set the list, check without sending, send now, configure auto-reply,
 disconnect.
 
+## Auto-reply to videos
+
+Besides keeping streaks alive, the bot can answer videos for you automatically —
+handy when a chat keeps the streak going with videos rather than plain hearts.
+
+You set it up in the "Auto-reply" menu:
+
+- **Who to reply to** — a list of chats (usernames) the bot should watch.
+- **Phrases** — your set of replies; the bot picks one at random and tries not
+  to repeat the same one twice in a row.
+
+Once it's turned on, every few minutes (10 by default) the bot looks into those
+chats and, if there's a new video you haven't answered yet, replies with a
+random phrase from your set. It reacts only to incoming videos — not to your own
+messages and not to plain text. The first time it opens a chat it just
+remembers what's already there and starts replying from the next video on, so it
+won't spam old messages. There's also a daily cap per chat as a safety net.
+
 ## What hardware you need
 
 **One server is enough.** The cheapest Linux VPS will do: 1 core and 1–2 GB of
