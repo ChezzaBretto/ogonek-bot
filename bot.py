@@ -169,7 +169,8 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Привет. Этот бот держит огоньки 🔥 в TikTok — каждую ночь сам шлёт ❤️ "
         "в выбранные чаты.\n\nДва шага для старта:\n"
-        "1. «🔗 Подключить TikTok»\n2. «✏️ Задать список»",
+        "1. «🔗 Подключить TikTok» — вход только через файл сессии (cookies), "
+        "по QR нельзя (риск бана)\n2. «✏️ Задать список»",
         reply_markup=KEYBOARD)
 
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -234,7 +235,7 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if text == BTN_CONNECT:
-        await connect(update, ctx)
+        await cmd_cookies(update, ctx)
     elif text == BTN_CHATS:
         await show_chats(update, ctx)
     elif text == BTN_LIST:
@@ -268,76 +269,6 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     InlineKeyboardButton("Отмена", callback_data="cancel")]]))
             return
         await update.message.reply_text("Не понял. Выбери кнопку ниже.", reply_markup=KEYBOARD)
-
-async def connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
-    if browser_lock.locked():
-        await update.message.reply_text("Сейчас занят другим пользователем — подожди минуту и жми снова.")
-        return
-
-    await update.message.reply_text(
-        "Открываю TikTok, сейчас будет QR.\n\n"
-        "Как придёт: <b>приложение TikTok → Профиль → ☰ → Сканировать QR</b> — наведи на код.\n"
-        "⚠️ Именно из приложения TikTok. Системной камерой или сканером из галереи "
-        "не сработает: откроется просто сайт, а вход не привяжется.\n"
-        "<b>После сканирования в приложении появится кнопка подтверждения входа — её надо нажать</b>, "
-        "иначе TikTok вход не завершит и я так и буду молчать.\n\n"
-        "Код живёт около минуты, я буду присылать свежий. "
-        "Если с QR не выходит — есть вход без него: /cookies",
-        parse_mode=ParseMode.HTML)
-
-    async with browser_lock:
-        proc = await asyncio.create_subprocess_exec(
-            PY, os.path.join(HERE, "qr_login.py"), user_dir(uid),
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
-
-        last_msg = None
-        try:
-            while True:
-                line = await asyncio.wait_for(proc.stdout.readline(), timeout=7 * 60)
-                if not line:
-                    break
-                line = line.decode("utf-8", "replace").strip()
-
-                log("QR-вход {}: {}".format(uid, line[:60]))
-
-                if line.startswith("QR "):
-                    path = line[3:]
-                    if last_msg:
-                        try:
-                            await last_msg.delete()
-                        except Exception:
-                            pass
-                    with open(path, "rb") as f:
-                        last_msg = await update.message.reply_photo(
-                            f, caption="Отсканируй этот код в приложении TikTok")
-                elif line == "OK":
-                    if last_msg:
-                        try:
-                            await last_msg.delete()
-                        except Exception:
-                            pass
-                    log("Вошёл: {}".format(uid))
-                    await update.message.reply_text(
-                        "✅ TikTok подключён.\n\nТеперь «📋 Показать мои чаты», "
-                        "потом «✏️ Задать список».", reply_markup=KEYBOARD)
-                    break
-                elif line.startswith("FAIL"):
-                    await update.message.reply_text(
-                        "Не получилось войти ({}).\n\nЧастая причина: код отсканирован, но в "
-                        "приложении не нажато подтверждение входа. Попробуй ещё раз — "
-                        "или заходи без QR: /cookies".format(esc(line[5:] or "?")),
-                        reply_markup=KEYBOARD)
-                    break
-        except asyncio.TimeoutError:
-            await update.message.reply_text(
-                "Время вышло. Жми «🔗 Подключить TikTok» заново — или заходи без QR: /cookies",
-                reply_markup=KEYBOARD)
-        finally:
-            try:
-                proc.kill()
-            except Exception:
-                pass
 
 async def show_chats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
@@ -482,9 +413,9 @@ async def auto_run(q, ctx, live):
     await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
 COOKIES_HELP = (
-    "<b>Вход без QR</b> — переносом готовой сессии из браузера. Пригодится, когда "
-    "QR не срабатывает: TikTok после сканирования ждёт подтверждения в приложении, "
-    "и если его не нажать, вход не завершается.\n\n"
+    "⚠️ <b>Вход только через файл сессии (cookies) TikTok.</b> Вход по QR-коду "
+    "не используется — он может привести к бану аккаунта. Подключайся строго "
+    "переносом cookies, как описано ниже.\n\n"
     "Суть везде одна: расширением <b>Cookie-Editor</b> на сайте tiktok.com сделать "
     "<b>Export as JSON</b> и прислать файл сюда. Вытащить сессию можно только "
     "расширением — «скопируй строку скриптом» не годится, оно не видит нужную куку.\n\n"

@@ -68,7 +68,7 @@ def main():
             report.append("⚠️ {} — {}".format(title, ERRORS.get(err, err)))
             if err in ("login_required", "no_session") and uid.isdigit():
                 notify.send(uid, "Сессия TikTok протухла — огоньки сегодня не продлились.\n"
-                                 "Нажми «Подключить TikTok» и отсканируй QR заново.")
+                                 "Подключись заново файлом сессии (cookies): команда /cookies.")
         else:
             log("{}: успешно {}, ошибок {}".format(title, res["ok"], res["fail"]))
             line = "✅ {} — {} ❤️".format(title, res["ok"])

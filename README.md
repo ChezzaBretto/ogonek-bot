@@ -10,8 +10,9 @@ their own TikTok to it.
 
 ## How it works
 
-1. You message the bot in Telegram and connect your TikTok account — either by
-   scanning a QR code from the app, or by sending a session file (cookies).
+1. You message the bot in Telegram and connect your TikTok account by sending a
+   session file (cookies). QR login is not used — it can get the account banned,
+   so cookies are the only supported way in.
 2. You tell the bot which chats to send ❤️ to (a list of usernames).
 3. From then on the bot runs on its own:
    - at midnight it goes through the list and sends ❤️ to each chat;
@@ -126,7 +127,6 @@ line of the crontab; for the service, put it in the unit
 | `daily_run.py` | the nightly send (cron) |
 | `retry_run.py` | daytime retries (cron) |
 | `autoreply.py`, `autoreply_run.py` | auto-reply to videos (cron) |
-| `qr_login.py`, `qr_session.sh` | TikTok login via QR code |
 | `notify.py` | service messages to the owner from the cron scripts |
 
 Your data (session, chat lists, settings) is stored in `users/<telegram_id>/`.
