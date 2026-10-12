@@ -1,0 +1,19 @@
+[Unit]
+Description=TikTok ogonyok Telegram bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# замени на своего пользователя и путь, куда склонировал репозиторий
+User=botuser
+WorkingDirectory=/opt/tiktok-ogonek
+ExecStart=/opt/tiktok-ogonek/.venv/bin/python /opt/tiktok-ogonek/bot.py
+Restart=on-failure
+RestartSec=5
+# Если TikTok-сессия снята в другой стране, направь ТОЛЬКО трафик Playwright
+# через SOCKS5-туннель в нужной стране (Telegram при этом ходит напрямую):
+# Environment=TT_PROXY=socks5://127.0.0.1:41080
+
+[Install]
+WantedBy=multi-user.target

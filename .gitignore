@@ -1,0 +1,30 @@
+# --- СЕКРЕТЫ И ЛИЧНЫЕ ДАННЫЕ: не коммитить никогда ---
+config.json          # реальный токен бота, admin_id, инвайт-код
+users/               # сессии TikTok (cookies.json), списки чатов, профили
+*.pickle             # состояние диалогов python-telegram-bot
+
+# cookies / сессии в любом месте
+cookies.json
+state.json
+cookies.txt
+
+# логи и временное
+*.log
+*.tmp
+*.lock
+.autoreply.cronlock
+.browser.lock
+qr_status.txt
+qr_*.png
+
+# бэкапы
+*.bak
+*.bak-*
+*.orig
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
