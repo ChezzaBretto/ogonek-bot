@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Ежедневный прогон по ВСЕМ пользователям бота. Запускается кроном в 00:00 МСК.
-Каждый пользователь обрабатывается отдельным процессом — на сервере 1 CPU и 2 ГБ,
-один Chromium за раз, иначе OOM.
-"""
 import sys, os, json, subprocess, time
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -15,8 +9,8 @@ import notify
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 USERS = os.path.join(HERE, "users")
-PY = sys.executable  # тот же интерпретатор, что запустил процесс (работает и из venv)
-TIMEOUT = 25 * 60  # на одного пользователя
+PY = sys.executable
+TIMEOUT = 25 * 60
 
 log = core.make_logger(os.path.join(HERE, "daily.log"))
 
@@ -27,7 +21,6 @@ ERRORS = {
     "no_chats": "список чатов не открылся",
 }
 
-
 def run_one(uid):
     user_dir = os.path.join(USERS, uid)
     proc = subprocess.run([PY, os.path.join(HERE, "runner.py"), user_dir, "--live"],
@@ -36,7 +29,6 @@ def run_one(uid):
         if line.startswith("RESULT "):
             return json.loads(line[7:])
     return {"error": "no_result", "ok": 0, "fail": 0, "sent": [], "missing": []}
-
 
 def main():
     if not os.path.isdir(USERS):
@@ -97,7 +89,6 @@ def main():
     log("Готово.")
     if report:
         notify.send_owner("🌙 Ночной прогон\n\n" + "\n".join(report))
-
 
 if __name__ == "__main__":
     main()

@@ -1,13 +1,7 @@
-# -*- coding: utf-8 -*-
-"""
-Отправка сообщений в Telegram из скриптов вне бота (ночной крон-прогон).
-Ходит через WARP-прокси: сервер в РФ, Bot API напрямую не отвечает.
-"""
 import os, json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(HERE, "config.json")
-
 
 def _cfg():
     try:
@@ -15,7 +9,6 @@ def _cfg():
             return json.load(f)
     except Exception:
         return {}
-
 
 def send(chat_id, text):
     cfg = _cfg()
@@ -32,8 +25,6 @@ def send(chat_id, text):
     except Exception:
         return False
 
-
 def send_owner(text):
-    """Служебное сообщение владельцу бота (отчёт о ночном прогоне и т.п.)."""
     c = _cfg()
     return send(c.get("owner_id") or c.get("admin_id"), text)

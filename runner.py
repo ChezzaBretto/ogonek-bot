@@ -1,13 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Прогон для ОДНОГО пользователя.
-
-  python runner.py <user_dir>            тест: показать чаты и цели, ничего не слать
-  python runner.py <user_dir> --live     боевой: разослать ❤️ по targets.txt
-  python runner.py <user_dir> --list     только собрать список чатов
-
-Последней строкой печатает  RESULT {json}  — это и читает бот.
-"""
 import sys, os, json, time, random, datetime
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -16,7 +6,6 @@ if hasattr(sys.stdout, "reconfigure"):
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tt_core as core
 from playwright.sync_api import sync_playwright
-
 
 def run(user_dir, live=False, list_only=False):
     cookies_path = os.path.join(user_dir, "cookies.json")
@@ -88,8 +77,6 @@ def run(user_dir, live=False, list_only=False):
                     log("Пропуск, уже сегодня: " + name)
                     continue
                 try:
-                    # ищем чат по нику в актуальном списке: TikTok поднимает
-                    # чаты наверх после каждой отправки, индексы живут минуты
                     core.send_to_chat(page, name)
                     state["sent"][key] = datetime.datetime.now().isoformat()
                     core.save_json(state_path, state)
@@ -114,19 +101,16 @@ def run(user_dir, live=False, list_only=False):
     core.save_json(state_path, core.prune_state(core.load_json(state_path, {"sent": {}})))
     return res
 
-
 def main():
     if len(sys.argv) < 2:
         print("нужен user_dir")
         return
     user_dir = sys.argv[1]
     args = set(sys.argv[2:])
-    # Ждём, пока освободится единственный Chromium на сервере. Держим ссылку:
-    # закроется файл — снимется замок.
-    _lock = core.hold_browser_lock()  # noqa: F841
+
+    _lock = core.hold_browser_lock()
     res = run(user_dir, live="--live" in args, list_only="--list" in args)
     print("RESULT " + json.dumps(res, ensure_ascii=False), flush=True)
-
 
 if __name__ == "__main__":
     main()

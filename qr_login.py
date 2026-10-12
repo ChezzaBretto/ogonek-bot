@@ -1,16 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-QR-вход в TikTok для одного пользователя бота. Запускается отдельным процессом,
-чтобы бот не блокировался и чтобы зависший браузер можно было просто убить.
-
-  python qr_login.py <user_dir>
-
-Печатает в stdout события для бота:
-  QR <путь к png>   — появился (или обновился) QR-код, покажи пользователю
-  OK                — вошли, cookies.json сохранён
-  FAIL <причина>    — не сложилось
-"""
-import sys, os, time, json, hashlib, base64
+import sys, os, time, hashlib, base64
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -22,12 +10,8 @@ from playwright.sync_api import sync_playwright
 WAIT_MINUTES = 5
 REFRESH_WORDS = ["обнов", "refresh", "истёк", "истек", "expired", "повтор"]
 
-# QR у TikTok — это canvas в пару сотен пикселей. Telegram растягивает такую
-# картинку на всю ширину пузыря со сглаживанием, и код перестаёт читаться
-# камерой. Поэтому увеличиваем битмап сами: целым множителем и без
-# интерполяции, чтобы модули остались ровными квадратами.
 QR_TARGET = 1000
-QR_MAX = 1280  # выше Telegram сам уменьшит фото и снова размоет
+QR_MAX = 1280
 QR_UPSCALE_JS = """
 el => {
   const native = Math.max(el.width, el.height);
@@ -51,31 +35,26 @@ el => {
 }
 """.replace("__TARGET__", str(QR_TARGET)).replace("__MAX__", str(QR_MAX))
 
-
 def emit(line):
     print(line, flush=True)
 
-
 def grab_qr(canvas, path):
-    """Сохраняет QR в разрешении, пригодном для сканирования с экрана."""
     data = None
     try:
         data = canvas.evaluate(QR_UPSCALE_JS)
     except Exception:
-        pass  # tainted canvas или сменившийся DOM — снимем как раньше
+        pass
     if data and data.startswith("data:image/png;base64,"):
         raw = base64.b64decode(data.split(",", 1)[1])
         if len(raw) > 500:
             with open(path, "wb") as f:
                 f.write(raw)
             return
-    canvas.screenshot(path=path)  # запас: мелкий QR лучше, чем никакой
-
+    canvas.screenshot(path=path)
 
 def qr_hash(path):
     with open(path, "rb") as f:
         return hashlib.md5(f.read()).hexdigest()
-
 
 def main():
     if len(sys.argv) < 2:
@@ -85,7 +64,7 @@ def main():
     os.makedirs(user_dir, exist_ok=True)
     qr_path = os.path.join(user_dir, "qr.png")
     cookies_path = os.path.join(user_dir, "cookies.json")
-    _lock = core.hold_browser_lock()  # noqa: F841 — тот же единственный Chromium
+    _lock = core.hold_browser_lock()
 
     with sync_playwright() as p:
         browser, ctx = core.new_context(p, scale=2)
@@ -99,10 +78,9 @@ def main():
             deadline = time.time() + WAIT_MINUTES * 60
 
             while time.time() < deadline:
-                # вошли?
                 try:
                     if any(c["name"] == "sessionid" for c in ctx.cookies()):
-                        page.wait_for_timeout(3000)  # дать TikTok дописать куки
+                        page.wait_for_timeout(3000)
                         cookies = core.normalize_cookies(ctx.cookies())
                         core.save_json(cookies_path, cookies)
                         os.chmod(cookies_path, 0o600)
@@ -111,7 +89,6 @@ def main():
                 except Exception:
                     pass
 
-                # QR протух — TikTok показывает кнопку обновления поверх кода
                 try:
                     for btn in page.locator("button, div[role='button'], a").all()[:60]:
                         txt = (btn.inner_text() or "").strip().lower()
@@ -122,7 +99,6 @@ def main():
                 except Exception:
                     pass
 
-                # снять текущий QR
                 try:
                     canvas = page.locator("canvas").first
                     if canvas.count() and canvas.is_visible():
@@ -144,7 +120,6 @@ def main():
                 ctx.close(); browser.close()
             except Exception:
                 pass
-
 
 if __name__ == "__main__":
     main()

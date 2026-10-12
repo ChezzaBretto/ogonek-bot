@@ -1,13 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Личный Telegram-бот продления огоньков TikTok.
-
-Бот работает только для своего владельца: владелец подключает свой TikTok
-(QR или файл сессии) → присылает список чатов → каждую ночь бот сам шлёт в них
-❤️. Чужие пользователи боту недоступны.
-
-Запуск: python bot.py
-"""
 import sys, os, json, html, asyncio, shutil, datetime
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -24,11 +14,10 @@ from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler,
 HERE = os.path.dirname(os.path.abspath(__file__))
 USERS = os.path.join(HERE, "users")
 CONFIG = os.path.join(HERE, "config.json")
-PY = sys.executable  # тот же интерпретатор, что запустил процесс (работает и из venv)
+PY = sys.executable
 
 log = core.make_logger(os.path.join(HERE, "tgbot.log"))
 
-# На сервере 1 CPU и 2 ГБ — Chromium строго по одному за раз.
 browser_lock = asyncio.Lock()
 
 BTN_CONNECT = "🔗 Подключить TikTok"
@@ -56,37 +45,27 @@ ERRORS = {
     "no_phrases": "Нет ни одной фразы для ответа. Жми «💬 Фразы».",
 }
 
-
-# ---------- конфиг и пользователи ----------
-
 def cfg():
     return core.load_json(CONFIG, {})
-
 
 def save_cfg(c):
     core.save_json(CONFIG, c)
 
-
 def user_dir(uid):
     return os.path.join(USERS, str(uid))
 
-
 def profile(uid):
     return core.load_json(os.path.join(user_dir(uid), "profile.json"), {})
-
 
 def save_profile(uid, prof):
     os.makedirs(user_dir(uid), exist_ok=True)
     core.save_json(os.path.join(user_dir(uid), "profile.json"), prof)
 
-
 def is_registered(uid):
     return os.path.exists(os.path.join(user_dir(uid), "profile.json"))
 
-
 def is_owner(uid):
     return str(uid) == str(cfg().get("owner_id"))
-
 
 def targets_of(uid):
     path = os.path.join(user_dir(uid), "targets.txt")
@@ -95,20 +74,14 @@ def targets_of(uid):
     with open(path, encoding="utf-8") as f:
         return [ln.strip() for ln in f if ln.strip()]
 
-
 def esc(s):
     return html.escape(str(s))
-
-
-# ---------- автоответ на видео ----------
 
 def reply_targets_of(uid):
     return _lines(os.path.join(user_dir(uid), "reply_targets.txt"))
 
-
 def phrases_of(uid):
     return _lines(os.path.join(user_dir(uid), "phrases.txt"))
-
 
 def _lines(path):
     if not os.path.exists(path):
@@ -116,22 +89,17 @@ def _lines(path):
     with open(path, encoding="utf-8") as f:
         return [ln.strip() for ln in f if ln.strip()]
 
-
 def _save_lines(path, items):
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(items) + "\n")
 
-
 def reply_state(uid):
     return core.load_json(os.path.join(user_dir(uid), "reply_state.json"), {})
-
 
 def save_reply_state(uid, st):
     core.save_json(os.path.join(user_dir(uid), "reply_state.json"), st)
 
-
 def save_targets(uid, nicks):
-    """Пишет targets.txt и возвращает текст ответа пользователю."""
     with open(os.path.join(user_dir(uid), "targets.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(nicks) + "\n")
     log("Список {}: сохранено {} ник(ов)".format(uid, len(nicks)))
@@ -149,11 +117,7 @@ def save_targets(uid, nicks):
                 "ночной прогон его пропустит. Жми «🔗 Подключить TikTok» или /cookies.")
     return msg
 
-
-# ---------- запуск браузерных задач ----------
-
 async def run_runner(uid, *flags):
-    """Гоняет runner.py в подпроцессе, возвращает разобранный RESULT."""
     proc = await asyncio.create_subprocess_exec(
         PY, os.path.join(HERE, "runner.py"), user_dir(uid), *flags,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
@@ -170,9 +134,7 @@ async def run_runner(uid, *flags):
             return res
     return {"error": "no_result"}
 
-
 async def run_autoreply(uid, *flags):
-    """Гоняет autoreply.py в подпроцессе, возвращает разобранный RESULT."""
     proc = await asyncio.create_subprocess_exec(
         PY, os.path.join(HERE, "autoreply.py"), user_dir(uid), *flags,
         stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT)
@@ -186,16 +148,11 @@ async def run_autoreply(uid, *flags):
             return json.loads(line[7:])
     return {"error": "no_result"}
 
-
-# ---------- команды ----------
-
 async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     u = update.effective_user
     uid = u.id
     c = cfg()
 
-    # Личный бот: владелец — тот, чей id в owner_id. Если он не задан,
-    # владельцем становится первый, кто написал боту, и его id сохраняется.
     if not c.get("owner_id"):
         c["owner_id"] = str(uid)
         save_cfg(c)
@@ -215,7 +172,6 @@ async def start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "1. «🔗 Подключить TikTok»\n2. «✏️ Задать список»",
         reply_markup=KEYBOARD)
 
-
 async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     if not is_owner(uid):
@@ -224,10 +180,6 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     awaiting = ctx.user_data.get("awaiting")
     log("MSG {} awaiting={}: {}".format(uid, awaiting or "-", text.replace("\n", " ⏎ ")[:100]))
 
-    # Кнопка — всегда кнопка, а не ввод. Все кнопки, кроме «Показать мои чаты»,
-    # сбрасывают режим ожидания — без этого подпись кнопки уезжала в targets.txt
-    # как ник. «Показать мои чаты» режим НЕ трогает: бот сам советует ею
-    # копировать ники посреди ввода списка, и сброс молча съедал новый список.
     if text in BUTTONS:
         awaiting = None
         if text != BTN_CHATS:
@@ -281,7 +233,6 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await auto_menu(update.message.reply_text, uid)
         return
 
-    # кнопки
     if text == BTN_CONNECT:
         await connect(update, ctx)
     elif text == BTN_CHATS:
@@ -309,10 +260,6 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     else:
         nicks = [ln.strip() for ln in text.splitlines() if ln.strip()]
         if len(nicks) >= 2:
-            # Несколько строк без режима ожидания — почти наверняка список
-            # ников, присланный без нажатия «✏️ Задать список». Раньше бот
-            # отвечал «Не понял», человек думал, что список принят, а рассылка
-            # продолжала идти по старому. Терять такое молча нельзя.
             ctx.user_data["pending_targets"] = nicks
             await update.message.reply_text(
                 "Похоже на список чатов ({} строк). Заменить им текущий список?".format(len(nicks)),
@@ -321,7 +268,6 @@ async def on_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     InlineKeyboardButton("Отмена", callback_data="cancel")]]))
             return
         await update.message.reply_text("Не понял. Выбери кнопку ниже.", reply_markup=KEYBOARD)
-
 
 async def connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
@@ -353,8 +299,6 @@ async def connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     break
                 line = line.decode("utf-8", "replace").strip()
 
-                # без этого лога непонятно, на чём встал вход у человека:
-                # дошло ли до QR, был ли FAIL, или он просто не подтвердил в приложении
                 log("QR-вход {}: {}".format(uid, line[:60]))
 
                 if line.startswith("QR "):
@@ -395,7 +339,6 @@ async def connect(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
 
-
 async def show_chats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     if browser_lock.locked():
@@ -415,7 +358,6 @@ async def show_chats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await msg.edit_text(
         "Твои чаты ({}). Скопируй нужные ники и отправь их через «✏️ Задать список»:\n\n"
         "<pre>{}</pre>".format(len(chats), body), parse_mode=ParseMode.HTML)
-
 
 async def check(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
@@ -442,7 +384,6 @@ async def check(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text += "\nВсё в порядке, ночью разошлю ❤️."
     await msg.edit_text(text, parse_mode=ParseMode.HTML)
 
-
 async def run_now(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid = update.effective_user.id
     if not targets_of(uid):
@@ -467,7 +408,6 @@ async def run_now(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         text = "Все чаты из списка уже получили ❤️ сегодня — повторно не шлю."
     await msg.edit_text(text, parse_mode=ParseMode.HTML)
 
-
 AUTO_KB = InlineKeyboardMarkup([
     [InlineKeyboardButton("👥 Кому отвечать", callback_data="ar_targets"),
      InlineKeyboardButton("💬 Фразы", callback_data="ar_phrases")],
@@ -475,15 +415,12 @@ AUTO_KB = InlineKeyboardMarkup([
      InlineKeyboardButton("🚀 Ответить сейчас", callback_data="ar_run")],
 ])
 
-
 def auto_kb(on):
     rows = [[InlineKeyboardButton("⏸ Выключить" if on else "▶️ Включить",
                                   callback_data="ar_off" if on else "ar_on")]]
     return InlineKeyboardMarkup(rows + list(AUTO_KB.inline_keyboard))
 
-
 async def auto_menu(send, uid, note=""):
-    """Экран автоответа. send — reply_text сообщения или edit_text у callback."""
     st = reply_state(uid)
     on = bool(st.get("enabled"))
     nicks, phrases = reply_targets_of(uid), phrases_of(uid)
@@ -506,9 +443,7 @@ async def auto_menu(send, uid, note=""):
         body.append("\n" + note)
     await send("\n".join(body), parse_mode=ParseMode.HTML, reply_markup=auto_kb(on))
 
-
 async def auto_run(q, ctx, live):
-    """Ручной прогон автоответчика: проверка или боевой ответ."""
     uid = q.from_user.id
     if not reply_targets_of(uid):
         await q.message.reply_text("Сначала «👥 Кому отвечать».")
@@ -546,7 +481,6 @@ async def auto_run(q, ctx, live):
         lines.append("\nСбоев при отправке: {}".format(res["fail"]))
     await msg.edit_text("\n".join(lines), parse_mode=ParseMode.HTML)
 
-
 COOKIES_HELP = (
     "<b>Вход без QR</b> — переносом готовой сессии из браузера. Пригодится, когда "
     "QR не срабатывает: TikTok после сканирования ждёт подтверждения в приложении, "
@@ -573,13 +507,10 @@ COOKIES_HELP = (
     "файлом удалю сразу после импорта: это доступ к аккаунту, в переписке ему не место."
 )
 
-
 async def cmd_cookies(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(COOKIES_HELP, parse_mode=ParseMode.HTML)
 
-
 async def on_document(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Импорт сессии TikTok файлом — обход QR-входа."""
     uid = update.effective_user.id
     if not is_owner(uid):
         return
@@ -617,7 +548,7 @@ async def on_document(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     msg = await ctx.bot.send_message(chat_id, "Сессия принята, проверяю — пускает ли TikTok...")
     try:
-        await update.message.delete()  # в приватном чате бот вправе убрать входящее
+        await update.message.delete()
     except Exception:
         pass
 
@@ -641,7 +572,6 @@ async def on_document(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "✅ TikTok подключён, вижу {} чат(ов).\n\nДальше «📋 Показать мои чаты», "
         "потом «✏️ Задать список».".format(len(chats)))
     await ctx.bot.send_message(chat_id, "Что делаем?", reply_markup=KEYBOARD)
-
 
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -696,7 +626,6 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ctx.user_data.pop("pending_targets", None)
         await q.edit_message_text("Отменил, всё на месте.")
 
-
 def main():
     c = cfg()
     if not c.get("token"):
@@ -704,13 +633,8 @@ def main():
         return
     os.makedirs(USERS, exist_ok=True)
 
-    # Сервер в РФ, Bot API режется DPI — ходим к Telegram через локальный
-    # WARP-прокси. Playwright при этом остаётся на прямом IP, иначе TikTok
-    # увидит смену страны и выбросит сессию.
     proxy = c.get("proxy") or None
-    # user_data держит режим ожидания ввода («жду инвайт-код», «жду список ников»).
-    # Без persistence рестарт бота посреди диалога терял его, и следующее
-    # сообщение человека уходило в «Не понял».
+
     builder = ApplicationBuilder().token(c["token"]).persistence(
         PicklePersistence(filepath=os.path.join(HERE, "ptb_state.pickle")))
     if proxy:
@@ -723,7 +647,6 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_text))
     log("Бот запущен.")
     app.run_polling(drop_pending_updates=True)
-
 
 if __name__ == "__main__":
     main()

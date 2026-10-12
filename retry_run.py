@@ -1,23 +1,4 @@
-# -*- coding: utf-8 -*-
-"""
-Добор недоставленных ❤️ в течение дня.
-
-Ночной прогон в 00:00 может дойти не до всех чатов: протухла сессия, TikTok
-икнул, сервер был занят, ник в списке написан с опечаткой. Огонёк тогда сгорит,
-а заметить это некому — в веб-версии TikTok огоньков не видно вообще, так что
-проверить их бот не может. Поэтому вместо проверки — доборы в течение дня.
-
-Браузер поднимается только если реально есть что досылать: если за сегодня всё
-разослано, скрипт выходит за доли секунды и Chromium не трогает.
-
-  python retry_run.py           обычный добор
-  python retry_run.py --final   последний за день: о недоборе пишем человеку
-
-Восстановить уже сгоревший огонёк бот не может — кнопка восстановления живёт
-только в приложении. Поэтому --final шлёт список проблемных чатов человеку,
-пока не истекло 48-часовое окно, в которое TikTok позволяет восстановить.
-"""
-import sys, os, json, datetime, time
+import sys, os, datetime, time
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -32,7 +13,6 @@ USERS = os.path.join(HERE, "users")
 
 log = core.make_logger(os.path.join(HERE, "daily.log"))
 
-
 def targets_of(user_dir):
     path = os.path.join(user_dir, "targets.txt")
     if not os.path.exists(path):
@@ -40,14 +20,11 @@ def targets_of(user_dir):
     with open(path, encoding="utf-8") as f:
         return [ln.strip() for ln in f if ln.strip()]
 
-
 def pending(user_dir):
-    """Ники, которым сегодня ещё не отправляли. Ключ состояния — 'ГГГГ-ММ-ДД::ник'."""
     state = core.load_json(os.path.join(user_dir, "state.json"), {}) or {}
     sent = state.get("sent", {})
     today = datetime.date.today().isoformat()
     return [t for t in targets_of(user_dir) if "{}::{}".format(today, t) not in sent]
-
 
 def main():
     final = "--final" in sys.argv[1:]
@@ -102,7 +79,6 @@ def main():
     if final and report:
         notify.send_owner("🌒 Вечерний добор\n\n" + "\n".join(report))
 
-
 def build_warning(still, err):
     msg = ("⚠️ Сегодня не получилось отправить ❤️ в чаты:\n• " + "\n• ".join(still) +
            "\n\nОгонёк там может сгореть.")
@@ -116,7 +92,6 @@ def build_warning(still, err):
             "в приложении. В течение 48 часов рядом с чатом появляется серый огонёк "
             "и предложение восстановить: успей нажать.")
     return msg
-
 
 if __name__ == "__main__":
     main()

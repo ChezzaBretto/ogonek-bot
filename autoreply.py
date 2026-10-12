@@ -1,17 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Автоответ на видео, присланные в личку TikTok.
-
-  python autoreply.py <user_dir>          разведка: кому бы ответил, ничего не шлёт
-  python autoreply.py <user_dir> --live   боевой прогон
-
-Кому отвечать — reply_targets.txt (ники как в списке чатов), чем отвечать —
-phrases.txt (по одной фразе в строке, берётся случайная). Состояние —
-reply_state.json. Последней строкой печатает RESULT {json} — его читает бот.
-
-Отвечаем только на видео из хвоста переписки после последнего нашего сообщения:
-ответили — хвост пуст — повторно бот не сработает.
-"""
 import sys, os, json, time, random, datetime
 
 if hasattr(sys.stdout, "reconfigure"):
@@ -21,22 +7,18 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tt_core as core
 from playwright.sync_api import sync_playwright
 
-
 def read_lines(path):
     if not os.path.exists(path):
         return []
     with open(path, encoding="utf-8") as f:
         return [ln.strip() for ln in f if ln.strip()]
 
-
 def pick_phrase(phrases, last):
-    """Случайная фраза, по возможности не та же, что в прошлый раз."""
     if len(phrases) > 1:
         choices = [p for p in phrases if p != last] or phrases
     else:
         choices = phrases
     return random.choice(choices)
-
 
 def run(user_dir, live=False):
     log = core.make_logger(os.path.join(user_dir, "autoreply.log"))
@@ -63,9 +45,6 @@ def run(user_dir, live=False):
         res["error"] = "no_phrases"
         return res
 
-    # Дневной лимит ответов на чат: подстраховка на случай, если TikTok
-    # переверстает личку и бот перестанет отличать своё сообщение от чужого —
-    # тогда он мог бы отвечать сам себе по кругу. 0 = без лимита.
     here = os.path.dirname(os.path.abspath(__file__))
     limit = core.load_json(os.path.join(here, "config.json"), {}).get("autoreply_limit", 0)
 
@@ -82,9 +61,6 @@ def run(user_dir, live=False):
                 res["error"] = "login_required"
                 return res
 
-            # Ждём не просто появления строк, а именно ников в них: сами
-            # строки TikTok рисует сразу, а имя собеседника подставляет
-            # заметно позже — на пустых именах ни одна цель не находилась.
             rows = []
             for _ in range(30):
                 rows = core.chat_rows(page)
@@ -103,11 +79,7 @@ def run(user_dir, live=False):
                 return out
 
             by_nick = index(rows)
-            # Ники подставляются только у строк, которые побывали в зоне
-            # видимости, поэтому часть списка приходит безымянной. Если так
-            # потерялась цель — прокручиваем список целиком (collect_chats это
-            # и делает) и пересобираем: иначе бот молча проходил бы мимо чата
-            # с новым видео.
+
             if any(t not in by_nick for t in targets):
                 core.collect_chats(page)
                 rows = core.chat_rows(page)
@@ -118,10 +90,6 @@ def run(user_dir, live=False):
             for nick in targets:
                 row = by_nick.get(nick)
                 if row is None:
-                    # Список виртуальный — в DOM висит только его верх. Но
-                    # любое новое сообщение поднимает чат наверх, так что чат
-                    # внизу списка = в нём ничего не появлялось. Ругаться стоит
-                    # только на ник, которого нет и среди известных вообще.
                     if known and nick in known:
                         res["skipped"] += 1
                     else:
@@ -132,7 +100,7 @@ def run(user_dir, live=False):
                 st = chats_state.get(nick)
                 if st is not None and st.get("preview") == row["preview"]:
                     res["skipped"] += 1
-                    continue  # ничего нового — чат не открываем
+                    continue
 
                 if not core.click_chat_by_name(page, nick):
                     res["missing"].append(nick)
@@ -146,9 +114,6 @@ def run(user_dir, live=False):
                 cur_preview = next((r["preview"] for r in fresh if r["nick"] == nick), row["preview"])
 
                 if st is None:
-                    # Первая встреча с чатом: только запоминаем, что в нём уже
-                    # лежит. Иначе включение автоответа разом отстрелялось бы
-                    # по всем старым видео, висящим в чатах неделями.
                     chats_state[nick] = {"preview": cur_preview, "day": today,
                                          "count": 0, "last_id": videos[-1]["id"] if videos else ""}
                     core.save_json(state_path, state)
@@ -209,16 +174,14 @@ def run(user_dir, live=False):
     core.save_json(state_path, state)
     return res
 
-
 def main():
     if len(sys.argv) < 2:
         print("нужен user_dir")
         return
     args = set(sys.argv[2:])
-    _lock = core.hold_browser_lock()  # noqa: F841  — Chromium на сервере строго один
+    _lock = core.hold_browser_lock()
     res = run(sys.argv[1], live="--live" in args)
     print("RESULT " + json.dumps(res, ensure_ascii=False), flush=True)
-
 
 if __name__ == "__main__":
     main()
